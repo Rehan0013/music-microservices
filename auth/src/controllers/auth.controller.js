@@ -2,6 +2,7 @@ import userModel from "../models/user.model.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import _config from "../config/config.js";
+import { publishToQueue } from "../broker/rabbit.js";
 
 const registerController = async (req, res) => {
     const { email, password, fullName: { firstName, lastName } } = req.body;
@@ -22,6 +23,13 @@ const registerController = async (req, res) => {
 
     const token = jwt.sign({ id: user._id, role: user.role }, _config.JWT_SECRET, {
         expiresIn: "2d",
+    });
+
+    await publishToQueue("user_created", {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
     });
 
     res.cookie("token", token, {
@@ -109,6 +117,13 @@ const googleAuthCallbackController = async (req, res) => {
         googleId: user.id,
         fullName: { firstName: user.name.givenName, lastName: user.name.familyName },
         role: "user",
+    });
+
+    await publishToQueue("user_created", {
+        id: newUser._id,
+        email: newUser.email,
+        fullName: newUser.fullName,
+        role: newUser.role,
     });
 
     const token = jwt.sign({ id: newUser._id, role: newUser.role }, _config.JWT_SECRET, {
