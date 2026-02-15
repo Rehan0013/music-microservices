@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import _config from "../config/config.js";
 import { publishToQueue } from "../broker/rabbit.js";
+import redis from "../db/redis.js";
 
 const registerController = async (req, res) => {
     const { email, password, fullName: { firstName, lastName } } = req.body;
@@ -149,4 +150,23 @@ const googleAuthCallbackController = async (req, res) => {
 };
 
 
-export { registerController, loginController, googleAuthCallbackController };
+const logoutController = async (req, res) => {
+    try {
+        const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
+
+        if (!token) {
+            return res.status(400).json({ message: "User Already Logged Out" });
+        }
+
+        await redis.set(`bl_${token}`, token, "EX", 60 * 60 * 24 * 2);
+
+        res.clearCookie("token");
+
+        res.status(200).json({ message: "Logged out successfully" });
+    } catch (error) {
+        console.error("Logout error:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+export { registerController, loginController, googleAuthCallbackController, logoutController };
