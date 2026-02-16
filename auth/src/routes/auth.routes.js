@@ -1,7 +1,15 @@
 import express from "express";
 import passport from "passport";
 
-import { registerController, loginController, googleAuthCallbackController, logoutController } from "../controllers/auth.controller.js";
+import {
+    registerController,
+    loginController,
+    googleAuthCallbackController,
+    logoutController,
+    verifyRegistrationController,
+    forgotPasswordController,
+    resetPasswordController
+} from "../controllers/auth.controller.js";
 import { registerValidation } from "../middlewares/validation.middleware.js";
 
 const router = express.Router();
@@ -10,6 +18,9 @@ const router = express.Router();
 router.post("/register", registerValidation, registerController);
 router.post("/login", loginController);
 router.post("/logout", logoutController);
+router.post("/verify-registration", verifyRegistrationController);
+router.post("/forgot-password", forgotPasswordController);
+router.post("/reset-password", resetPasswordController);
 
 router.get('/google',
     passport.authenticate('google', { scope: ['profile', 'email'] })

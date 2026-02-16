@@ -1,6 +1,6 @@
 import app from "./src/app.js";
 import config from "./src/config/config.js";
-import startListener from "./src/broker/listner.js";
+import startListener from "./src/broker/listener.js";
 import { connect } from "./src/broker/rabbit.js";
 
 // connect to rabbitmq

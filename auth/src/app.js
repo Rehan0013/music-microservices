@@ -1,3 +1,4 @@
+// import packages
 import express from "express";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
@@ -27,8 +28,6 @@ passport.use(new GoogleStrategy({
     clientSecret: _config.CLIENT_SECRET,
     callbackURL: '/api/auth/google/callback',
 }, (accessToken, refreshToken, profile, done) => {
-    // Here, you would typically find or create a user in your database
-    // For this example, we'll just return the profile
     return done(null, profile);
 }));
 
@@ -37,7 +36,7 @@ app.get("/health", (req, res) => {
     res.json({ message: "Auth service is running", uptime: process.uptime() });
 });
 
-//routes
+// routes
 app.use("/api/auth", authRoutes);
 
 export default app;
