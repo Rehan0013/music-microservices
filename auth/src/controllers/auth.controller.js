@@ -77,7 +77,7 @@ const loginController = async (req, res) => {
     }
 
     // generate token with 2 days expiry
-    const token = jwt.sign({ id: user._id, role: user.role }, _config.JWT_SECRET, {
+    const token = jwt.sign({ id: user._id, role: user.role, firstName: user.fullName.firstName, lastName: user.fullName.lastName }, _config.JWT_SECRET, {
         expiresIn: "2d",
     });
 
@@ -109,7 +109,7 @@ const googleAuthCallbackController = async (req, res) => {
     // if user exist then generate token and set in cookie
     if (isUserExist) {
         // generate token with 2 days expiry
-        const token = jwt.sign({ id: isUserExist._id, role: isUserExist.role }, _config.JWT_SECRET, {
+        const token = jwt.sign({ id: isUserExist._id, role: isUserExist.role, firstName: isUserExist.fullName.firstName, lastName: isUserExist.fullName.lastName }, _config.JWT_SECRET, {
             expiresIn: "2d",
         });
 
@@ -149,7 +149,7 @@ const googleAuthCallbackController = async (req, res) => {
     });
 
     // generate token with 2 days expiry
-    const token = jwt.sign({ id: newUser._id, role: newUser.role }, _config.JWT_SECRET, {
+    const token = jwt.sign({ id: newUser._id, role: newUser.role, firstName: newUser.fullName.firstName, lastName: newUser.fullName.lastName }, _config.JWT_SECRET, {
         expiresIn: "2d",
     });
 
@@ -224,7 +224,7 @@ const verifyRegistrationController = async (req, res) => {
         });
 
         // generate token with 2 days expiry
-        const token = jwt.sign({ id: user._id, role: user.role }, _config.JWT_SECRET, {
+        const token = jwt.sign({ id: user._id, role: user.role, firstName: user.fullName.firstName, lastName: user.fullName.lastName }, _config.JWT_SECRET, {
             expiresIn: "2d",
         });
 
