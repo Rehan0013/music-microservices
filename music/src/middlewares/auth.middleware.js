@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import _config from "../config/config.js";
 import redis from "../db/redis.js";
 
-const authMiddleware = async (req, res, next) => {
+const authArtistMiddleware = async (req, res, next) => {
     try {
         const token = req.cookies.token;
         if (!token) {
@@ -27,6 +27,4 @@ const authMiddleware = async (req, res, next) => {
     }
 };
 
-// Export as authArtistMiddleware since it checks for artist role
-export const authArtistMiddleware = authMiddleware;
-export default authMiddleware;
+export { authArtistMiddleware };
