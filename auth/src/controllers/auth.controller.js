@@ -35,7 +35,8 @@ const registerController = async (req, res) => {
             email,
             password,
             firstName,
-            lastName
+            lastName,
+            role: "user" // Explicitly set role to user
         };
 
         // Hash password before storing in Redis to avoid plain text storage
@@ -212,7 +213,7 @@ const verifyRegistrationController = async (req, res) => {
             return res.status(400).json({ message: "Invalid OTP" });
         }
 
-        // create user
+        // create user using the role stored in Redis (default to 'user' if missing for backward compatibility)
         const user = await userModel.create({
             email: userData.email,
             password: userData.password,
@@ -220,7 +221,7 @@ const verifyRegistrationController = async (req, res) => {
                 firstName: userData.firstName,
                 lastName: userData.lastName
             },
-            role: "user",
+            role: userData.role || "user",
         });
 
         // generate token with 2 days expiry
@@ -327,6 +328,123 @@ const resetPasswordController = async (req, res) => {
     }
 };
 
+const artistRegisterController = async (req, res) => {
+    try {
+        const { email, password, fullName: { firstName, lastName } } = req.body;
+
+        // check user exist or not
+        const user = await userModel.findOne({ email });
+        if (user) {
+            return res.status(400).json({ message: "User already exists" });
+        }
+
+        // generate otp
+        const otp = generateOTP();
+
+        // Store user data and OTP in Redis with 10 minutes expiration
+        const userData = {
+            email,
+            password,
+            firstName,
+            lastName,
+            role: "artist" // Explicitly set role to artist
+        };
+
+        // Hash password before storing in Redis to avoid plain text storage
+        const hashedPassword = await bcrypt.hash(password, 10);
+        userData.password = hashedPassword;
+
+        // Store user data and OTP in Redis with 10 minutes expiration
+        await redis.set(`reg_${email}`, JSON.stringify({ userData, otp }), "EX", 60 * 10);
+
+        // Publish to queue to send email
+        await publishToQueue("send_otp", {
+            email,
+            otp,
+            fullName: { firstName, lastName },
+            type: "registration"
+        });
+
+        res.status(200).json({ message: "OTP sent to your email. Please verify to complete registration." });
+
+    } catch (error) {
+        console.error("Artist Register error:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+const googleArtistAuthCallbackController = async (req, res) => {
+    const { user } = req;
+
+    // check user exist or not
+    const isUserExist = await userModel.findOne({ $or: [{ email: user.emails[0].value }, { googleId: user.id }] });
+
+    // if user exist then generate token and set in cookie
+    if (isUserExist) {
+        // generate token with 2 days expiry
+        const token = jwt.sign({ id: isUserExist._id, role: isUserExist.role, firstName: isUserExist.fullName.firstName, lastName: isUserExist.fullName.lastName }, _config.JWT_SECRET, {
+            expiresIn: "2d",
+        });
+
+        // set token in cookie
+        res.cookie("token", token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: "strict",
+            maxAge: 2 * 24 * 60 * 60 * 1000,
+        });
+
+        return res.status(200).json({
+            message: "User logged in successfully",
+            user: {
+                _id: isUserExist._id,
+                email: isUserExist.email,
+                fullName: isUserExist.fullName,
+                role: isUserExist.role,
+            },
+        });
+    }
+
+    // create new user
+    const newUser = await userModel.create({
+        email: user.emails[0].value,
+        googleId: user.id,
+        fullName: { firstName: user.name.givenName, lastName: user.name.familyName },
+        role: "artist", // Role is artist for this callback
+    });
+
+    // publish to queue to create user in database
+    await publishToQueue("user_created", {
+        id: newUser._id,
+        email: newUser.email,
+        fullName: newUser.fullName,
+        role: newUser.role,
+    });
+
+    // generate token with 2 days expiry
+    const token = jwt.sign({ id: newUser._id, role: newUser.role, firstName: newUser.fullName.firstName, lastName: newUser.fullName.lastName }, _config.JWT_SECRET, {
+        expiresIn: "2d",
+    });
+
+    // set token in cookie
+    res.cookie("token", token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        maxAge: 2 * 24 * 60 * 60 * 1000,
+    });
+
+    res.status(201).json({
+        message: "User registered successfully",
+        user: {
+            _id: newUser._id,
+            email: newUser.email,
+            fullName: newUser.fullName,
+            role: newUser.role,
+        },
+    });
+};
+
 export {
     registerController,
     loginController,
@@ -334,5 +452,7 @@ export {
     logoutController,
     verifyRegistrationController,
     forgotPasswordController,
-    resetPasswordController
+    resetPasswordController,
+    artistRegisterController,
+    googleArtistAuthCallbackController
 };
