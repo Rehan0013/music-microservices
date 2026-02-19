@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import _config from "../src/config/config.js";
 
 import musicRoutes from "../src/routes/music.routes.js";
+import playlistRoutes from "../src/routes/playlist.routes.js";
 
 const app = express();
 
@@ -26,5 +27,6 @@ app.get("/health", (req, res) => {
 
 // routes
 app.use("/api/music", musicRoutes);
+app.use("/api/playlist", playlistRoutes);
 
 export default app;
