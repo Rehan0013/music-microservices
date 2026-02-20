@@ -22,8 +22,14 @@ export async function subscribeToQueue(queueName, callback) {
     await channel.assertQueue(queueName, { durable: true });
     channel.consume(queueName, async (msg) => {
         if (msg !== null) {
-            await callback(JSON.parse(msg.content.toString()));
-            await channel.ack(msg);
+            try {
+                await callback(JSON.parse(msg.content.toString()));
+                channel.ack(msg);
+            } catch (error) {
+                console.error("Error processing message:", error);
+                // Requeue the message if it failed
+                channel.nack(msg);
+            }
         }
     });
 

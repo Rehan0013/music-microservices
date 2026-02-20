@@ -17,48 +17,15 @@ import redis from "../db/redis.js";
 // import utils
 import { generateOTP } from "../utils/otp.js";
 
-const registerController = async (req, res) => {
+import { handleRegistration } from "../utils/auth.utils.js";
+
+const registerController = async (req, res, next) => {
     try {
         const { email, password, fullName: { firstName, lastName } } = req.body;
-
-        // check user exist or not
-        const isUserExist = await userModel.findOne({ email });
-        if (isUserExist) {
-            return res.status(400).json({ message: "User already exists" });
-        }
-
-        // generate otp
-        const otp = generateOTP();
-
-        // Store user data and OTP in Redis with 10 minutes expiration
-        const userData = {
-            email,
-            password,
-            firstName,
-            lastName,
-            role: "user" // Explicitly set role to user
-        };
-
-        // Hash password before storing in Redis to avoid plain text storage
-        const hashedPassword = await bcrypt.hash(password, 10);
-        userData.password = hashedPassword;
-
-        // Store user data and OTP in Redis with 10 minutes expiration
-        await redis.set(`reg_${email}`, JSON.stringify({ userData, otp }), "EX", 60 * 10);
-
-        // Publish to queue to send email
-        await publishToQueue("send_otp", {
-            email,
-            otp,
-            fullName: { firstName, lastName },
-            type: "registration"
-        });
-
+        await handleRegistration({ email, password, firstName, lastName, role: "user" });
         res.status(200).json({ message: "OTP sent to your email. Please verify to complete registration." });
-
     } catch (error) {
-        console.error("Register error:", error);
-        res.status(500).json({ message: "Internal server error" });
+        next(error);
     }
 };
 
@@ -101,48 +68,30 @@ const loginController = async (req, res) => {
     });
 };
 
-const googleAuthCallbackController = async (req, res) => {
-    const { user } = req;
+const handleGoogleCallback = async (res, user, role) => {
+    // check user exist
+    let targetUser = await userModel.findOne({ $or: [{ email: user.emails[0].value }, { googleId: user.id }] });
 
-    // check user exist or not
-    const isUserExist = await userModel.findOne({ $or: [{ email: user.emails[0].value }, { googleId: user.id }] });
-
-    // if user exist then generate token and set in cookie
-    if (isUserExist) {
-        // generate token with 2 days expiry
-        const token = jwt.sign({ id: isUserExist._id, role: isUserExist.role, firstName: isUserExist.fullName.firstName, lastName: isUserExist.fullName.lastName }, _config.JWT_SECRET, {
-            expiresIn: "2d",
+    if (!targetUser) {
+        // create new user
+        targetUser = await userModel.create({
+            email: user.emails[0].value,
+            googleId: user.id,
+            fullName: { firstName: user.name.givenName, lastName: user.name.familyName },
+            role: role,
         });
 
-        // set token in cookie
-        res.cookie("token", token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: "strict",
-            maxAge: 2 * 24 * 60 * 60 * 1000,
+        // publish to queue to create user in database
+        await publishToQueue("user_created", {
+            id: targetUser._id,
+            email: targetUser.email,
+            fullName: targetUser.fullName,
+            role: targetUser.role,
         });
-
-        return res.redirect("http://localhost:5173");
     }
 
-    // create new user
-    const newUser = await userModel.create({
-        email: user.emails[0].value,
-        googleId: user.id,
-        fullName: { firstName: user.name.givenName, lastName: user.name.familyName },
-        role: "user",
-    });
-
-    // publish to queue to create user in database
-    await publishToQueue("user_created", {
-        id: newUser._id,
-        email: newUser.email,
-        fullName: newUser.fullName,
-        role: newUser.role,
-    });
-
     // generate token with 2 days expiry
-    const token = jwt.sign({ id: newUser._id, role: newUser.role, firstName: newUser.fullName.firstName, lastName: newUser.fullName.lastName }, _config.JWT_SECRET, {
+    const token = jwt.sign({ id: targetUser._id, role: targetUser.role, firstName: targetUser.fullName.firstName, lastName: targetUser.fullName.lastName }, _config.JWT_SECRET, {
         expiresIn: "2d",
     });
 
@@ -155,6 +104,14 @@ const googleAuthCallbackController = async (req, res) => {
     });
 
     res.redirect("http://localhost:5173");
+};
+
+const googleAuthCallbackController = async (req, res, next) => {
+    try {
+        await handleGoogleCallback(res, req.user, "user");
+    } catch (error) {
+        next(error);
+    }
 };
 
 
@@ -312,105 +269,22 @@ const resetPasswordController = async (req, res) => {
     }
 };
 
-const artistRegisterController = async (req, res) => {
+const artistRegisterController = async (req, res, next) => {
     try {
         const { email, password, fullName: { firstName, lastName } } = req.body;
-
-        // check user exist or not
-        const user = await userModel.findOne({ email });
-        if (user) {
-            return res.status(400).json({ message: "User already exists" });
-        }
-
-        // generate otp
-        const otp = generateOTP();
-
-        // Store user data and OTP in Redis with 10 minutes expiration
-        const userData = {
-            email,
-            password,
-            firstName,
-            lastName,
-            role: "artist" // Explicitly set role to artist
-        };
-
-        // Hash password before storing in Redis to avoid plain text storage
-        const hashedPassword = await bcrypt.hash(password, 10);
-        userData.password = hashedPassword;
-
-        // Store user data and OTP in Redis with 10 minutes expiration
-        await redis.set(`reg_${email}`, JSON.stringify({ userData, otp }), "EX", 60 * 10);
-
-        // Publish to queue to send email
-        await publishToQueue("send_otp", {
-            email,
-            otp,
-            fullName: { firstName, lastName },
-            type: "registration"
-        });
-
+        await handleRegistration({ email, password, firstName, lastName, role: "artist" });
         res.status(200).json({ message: "OTP sent to your email. Please verify to complete registration." });
-
     } catch (error) {
-        console.error("Artist Register error:", error);
-        res.status(500).json({ message: "Internal server error" });
+        next(error);
     }
 };
 
-const googleArtistAuthCallbackController = async (req, res) => {
-    const { user } = req;
-
-    // check user exist or not
-    const isUserExist = await userModel.findOne({ $or: [{ email: user.emails[0].value }, { googleId: user.id }] });
-
-    // if user exist then generate token and set in cookie
-    if (isUserExist) {
-        // generate token with 2 days expiry
-        const token = jwt.sign({ id: isUserExist._id, role: isUserExist.role, firstName: isUserExist.fullName.firstName, lastName: isUserExist.fullName.lastName }, _config.JWT_SECRET, {
-            expiresIn: "2d",
-        });
-
-        // set token in cookie
-        res.cookie("token", token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: "strict",
-            maxAge: 2 * 24 * 60 * 60 * 1000,
-        });
-
-        return res.redirect("http://localhost:5173");
+const googleArtistAuthCallbackController = async (req, res, next) => {
+    try {
+        await handleGoogleCallback(res, req.user, "artist");
+    } catch (error) {
+        next(error);
     }
-
-    // create new user
-    const newUser = await userModel.create({
-        email: user.emails[0].value,
-        googleId: user.id,
-        fullName: { firstName: user.name.givenName, lastName: user.name.familyName },
-        role: "artist", // Role is artist for this callback
-    });
-
-    // publish to queue to create user in database
-    await publishToQueue("user_created", {
-        id: newUser._id,
-        email: newUser.email,
-        fullName: newUser.fullName,
-        role: newUser.role,
-    });
-
-    // generate token with 2 days expiry
-    const token = jwt.sign({ id: newUser._id, role: newUser.role, firstName: newUser.fullName.firstName, lastName: newUser.fullName.lastName }, _config.JWT_SECRET, {
-        expiresIn: "2d",
-    });
-
-    // set token in cookie
-    res.cookie("token", token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "strict",
-        maxAge: 2 * 24 * 60 * 60 * 1000,
-    });
-
-    res.redirect("http://localhost:5173");
 };
 
 export {

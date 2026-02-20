@@ -1,0 +1,54 @@
+import bcrypt from "bcryptjs";
+import redis from "../db/redis.js";
+import { generateOTP } from "./otp.js";
+import { publishToQueue } from "../broker/rabbit.js";
+import userModel from "../models/user.model.js";
+
+/**
+ * Handles the common registration logic: checking user existence, generating OTP,
+ * hashing password, storing data in Redis, and publishing OTP event.
+ * 
+ * @param {Object} params - Registration parameters
+ * @param {string} params.email - User email
+ * @param {string} params.password - User password
+ * @param {string} params.firstName - User first name
+ * @param {string} params.lastName - User last name
+ * @param {string} params.role - User role ('user' or 'artist')
+ * @returns {Promise<void>}
+ */
+export const handleRegistration = async ({ email, password, firstName, lastName, role }) => {
+    // check user exist or not
+    const isUserExist = await userModel.findOne({ email });
+    if (isUserExist) {
+        const error = new Error("User already exists");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    // generate otp
+    const otp = generateOTP();
+
+    // Store user data and OTP in Redis with 10 minutes expiration
+    const userData = {
+        email,
+        password,
+        firstName,
+        lastName,
+        role
+    };
+
+    // Hash password before storing in Redis to avoid plain text storage
+    const hashedPassword = await bcrypt.hash(password, 10);
+    userData.password = hashedPassword;
+
+    // Store user data and OTP in Redis with 10 minutes expiration
+    await redis.set(`reg_${email}`, JSON.stringify({ userData, otp }), "EX", 60 * 10);
+
+    // Publish to queue to send email
+    await publishToQueue("send_otp", {
+        email,
+        otp,
+        fullName: { firstName, lastName },
+        type: "registration"
+    });
+};

@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - music-network
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - music-network
+
+  auth:
+    build: ./auth
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - MONGO_URI=mongodb+srv://rehanali:rehanali@cluster0.n1234.mongodb.net/auth-service?retryWrites=true&w=majority
+      - JWT_SECRET=your_jwt_secret_key
+      - RABBITMQ_URI=amqp://rabbitmq:5672
+      - REDIS_URI=redis:6379
+      # Google OAuth Credentials (replace with actual values)
+      - CLIENT_ID=${CLIENT_ID}
+      - CLIENT_SECRET=${CLIENT_SECRET}
+    depends_on:
+      - rabbitmq
+      - redis
+    networks:
+      - music-network
+
+  music:
+    build: ./music
+    ports:
+      - "4001:4001"
+    environment:
+      - PORT=4001
+      - MONGO_URI=mongodb+srv://rehanali:rehanali@cluster0.n1234.mongodb.net/music-service?retryWrites=true&w=majority
+      - JWT_SECRET=your_jwt_secret_key
+      - RABBITMQ_URI=amqp://rabbitmq:5672
+      - REDIS_URI=redis:6379
+      # ImageKit Credentials (replace with actual values)
+      - IMAGEKIT_PUBLIC_KEY=${IMAGEKIT_PUBLIC_KEY}
+      - IMAGEKIT_PRIVATE_KEY=${IMAGEKIT_PRIVATE_KEY}
+      - IMAGEKIT_URL_ENDPOINT=${IMAGEKIT_URL_ENDPOINT}
+    depends_on:
+      - rabbitmq
+      - redis
+    networks:
+      - music-network
+
+  notification:
+    build: ./notification
+    environment:
+      - PORT=4002
+      - RABBITMQ_URI=amqp://rabbitmq:5672
+      # Email Credentials (replace with actual values)
+      - EMAIL_USER=${EMAIL_USER}
+      - CLIENT_ID=${CLIENT_ID}
+      - CLIENT_SECRET=${CLIENT_SECRET}
+      - REFRESH_TOKEN=${REFRESH_TOKEN}
+    depends_on:
+      - rabbitmq
+    networks:
+      - music-network
+
+networks:
+  music-network:
+    driver: bridge

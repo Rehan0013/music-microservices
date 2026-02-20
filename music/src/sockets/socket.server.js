@@ -16,7 +16,9 @@ async function initSocketServer(httpServer) {
     });
 
     io.use(async (socket, next) => {
-        const token = cookie.parse(socket.handshake.headers.cookie);
+        const cookies = socket.handshake.headers.cookie ? cookie.parse(socket.handshake.headers.cookie) : {};
+        const token = cookies.token;
+
         if (!token) {
             return next(new Error("Authentication error"));
         }

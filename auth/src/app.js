@@ -3,6 +3,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import cors from "cors";
+import helmet from "helmet";
 
 // config
 import _config from "../src/config/config.js";
@@ -15,6 +16,7 @@ import authRoutes from "./routes/auth.routes.js";
 
 const app = express();
 
+app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -43,5 +45,11 @@ app.get("/health", (req, res) => {
 
 // routes
 app.use("/api/auth", authRoutes);
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ message: "Internal Server Error", error: err.message });
+});
 
 export default app;
