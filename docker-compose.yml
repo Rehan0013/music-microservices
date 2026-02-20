@@ -22,7 +22,7 @@ services:
       - "4000:4000"
     environment:
       - PORT=4000
-      - MONGO_URI=mongodb+srv://rehanali:rehanali@cluster0.n1234.mongodb.net/auth-service?retryWrites=true&w=majority
+      - MONGO_URI=mongodb+srv://localhost:27017/auth-service?retryWrites=true&w=majority
       - JWT_SECRET=your_jwt_secret_key
       - RABBITMQ_URI=amqp://rabbitmq:5672
       - REDIS_URI=redis:6379
@@ -41,7 +41,7 @@ services:
       - "4001:4001"
     environment:
       - PORT=4001
-      - MONGO_URI=mongodb+srv://rehanali:rehanali@cluster0.n1234.mongodb.net/music-service?retryWrites=true&w=majority
+      - MONGO_URI=mongodb+srv://localhost:27017/music-service?retryWrites=true&w=majority
       - JWT_SECRET=your_jwt_secret_key
       - RABBITMQ_URI=amqp://rabbitmq:5672
       - REDIS_URI=redis:6379
