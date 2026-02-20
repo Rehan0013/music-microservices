@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import * as musicController from '../controllers/music.controller.js';
-import { authArtistMiddleware, authMiddeware } from '../middlewares/auth.middleware.js';
+import { authArtistMiddleware, authMiddleware } from '../middlewares/auth.middleware.js';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -13,9 +13,9 @@ router.post('/create', authArtistMiddleware,
         { name: "coverImage", maxCount: 1 }
     ]), musicController.createMusic);
 
-router.get('/get', authMiddeware, musicController.getMusic);
+router.get('/get', authMiddleware, musicController.getMusic);
 
-router.get('/:id', authMiddeware, musicController.getSingleMusic);
+router.get('/:id', authMiddleware, musicController.getSingleMusic);
 
 router.delete('/:id', authArtistMiddleware, musicController.deleteMusic);
 

@@ -27,7 +27,7 @@ const authArtistMiddleware = async (req, res, next) => {
     }
 };
 
-const authMiddeware = async (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
     try {
         const token = req.cookies.token;
         if (!token) {
@@ -49,4 +49,4 @@ const authMiddeware = async (req, res, next) => {
     }
 };
 
-export { authArtistMiddleware, authMiddeware };
+export { authArtistMiddleware, authMiddleware };
