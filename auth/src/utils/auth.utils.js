@@ -3,7 +3,8 @@ import redis from "../db/redis.js";
 import { generateOTP } from "./otp.js";
 import { publishToQueue } from "../broker/rabbit.js";
 import userModel from "../models/user.model.js";
-
+import _config from "../config/config.js";
+import jwt from "jsonwebtoken";
 /**
  * Handles the common registration logic: checking user existence, generating OTP,
  * hashing password, storing data in Redis, and publishing OTP event.
