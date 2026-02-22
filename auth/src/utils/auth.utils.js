@@ -16,7 +16,7 @@ import userModel from "../models/user.model.js";
  * @param {string} params.role - User role ('user' or 'artist')
  * @returns {Promise<void>}
  */
-export const handleRegistration = async ({ email, password, firstName, lastName, role }) => {
+const handleRegistration = async ({ email, password, firstName, lastName, role }) => {
     // check user exist or not
     const isUserExist = await userModel.findOne({ email });
     if (isUserExist) {
@@ -52,3 +52,43 @@ export const handleRegistration = async ({ email, password, firstName, lastName,
         type: "registration"
     });
 };
+
+const handleGoogleCallback = async (res, user, role) => {
+    // check user exist
+    let targetUser = await userModel.findOne({ $or: [{ email: user.emails[0].value }, { googleId: user.id }] });
+
+    if (!targetUser) {
+        // create new user
+        targetUser = await userModel.create({
+            email: user.emails[0].value,
+            googleId: user.id,
+            fullName: { firstName: user.name.givenName, lastName: user.name.familyName },
+            role: role,
+        });
+
+        // publish to queue to create user in database
+        await publishToQueue("user_created", {
+            id: targetUser._id,
+            email: targetUser.email,
+            fullName: targetUser.fullName,
+            role: targetUser.role,
+        });
+    }
+
+    // generate token with 2 days expiry
+    const token = jwt.sign({ id: targetUser._id, role: targetUser.role, firstName: targetUser.fullName.firstName, lastName: targetUser.fullName.lastName }, _config.JWT_SECRET, {
+        expiresIn: "2d",
+    });
+
+    // set token in cookie
+    res.cookie("token", token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        maxAge: 2 * 24 * 60 * 60 * 1000,
+    });
+
+    res.redirect("http://localhost:5173");
+};
+
+export { handleRegistration, handleGoogleCallback };
